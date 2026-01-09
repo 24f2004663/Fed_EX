@@ -32,8 +32,31 @@ async function getDashboardData() {
   return { cases, totalAmount, highPriorityCount, recoveryRate, avgDSO };
 }
 
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+
 export default async function DashboardPage() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get('fedex_auth_token');
+
+  if (!token) {
+    redirect('/login');
+  }
+
   const { cases, totalAmount, highPriorityCount, recoveryRate, avgDSO } = await getDashboardData();
+
+  // Optional: Check role if needed, but existence is sufficient for "prerequisite" requirement
+  try {
+    const session = JSON.parse(token.value);
+    // If Agency tries to access Manager Dashboard, maybe redirect to /agency? 
+    // User requested "login must be prerequisites". 
+    // If we are stricter:
+    if (session.role === 'AGENCY') {
+      redirect('/agency');
+    }
+  } catch {
+    redirect('/login');
+  }
 
   return (
     <main className="min-h-screen bg-gray-50 p-8">
