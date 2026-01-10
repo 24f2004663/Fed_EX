@@ -38,33 +38,35 @@ export function HistoricalPerformanceGraph() {
                 <p className="text-sm text-gray-500">Agency Success Rate vs Model Threshold & Volume</p>
             </div>
 
-            <ResponsiveContainer width="100%" height="90%">
-                <ComposedChart
-                    data={data}
-                    margin={{
-                        top: 20,
-                        right: 20,
-                        bottom: 20,
-                        left: 20,
-                    }}
-                >
-                    <CartesianGrid stroke="#f5f5f5" />
-                    <XAxis dataKey="name" scale="point" padding={{ left: 10, right: 10 }} />
-                    <YAxis yAxisId="left" orientation="left" stroke="#8884d8" label={{ value: 'Success %', angle: -90, position: 'insideLeft' }} />
-                    <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" label={{ value: 'Volume ($)', angle: 90, position: 'insideRight' }} />
-                    <Tooltip />
-                    <Legend />
+            <div className="flex-1 min-h-0">
+                <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart
+                        data={data}
+                        margin={{
+                            top: 20,
+                            right: 20,
+                            bottom: 20,
+                            left: 20,
+                        }}
+                    >
+                        <CartesianGrid stroke="#f5f5f5" />
+                        <XAxis dataKey="name" scale="point" padding={{ left: 10, right: 10 }} />
+                        <YAxis yAxisId="left" orientation="left" stroke="#8884d8" label={{ value: 'Success %', angle: -90, position: 'insideLeft' }} />
+                        <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" label={{ value: 'Volume ($)', angle: 90, position: 'insideRight' }} />
+                        <Tooltip />
+                        <Legend />
 
-                    {/* Volume (Area) */}
-                    <Area yAxisId="right" type="monotone" dataKey="volume" fill="#e0e7ff" stroke="#8884d8" name="Recovery Volume ($)" />
+                        {/* Volume (Area) */}
+                        <Area yAxisId="right" type="monotone" dataKey="volume" fill="#e0e7ff" stroke="#8884d8" name="Recovery Volume ($)" />
 
-                    {/* Success Rate (Bar) */}
-                    <Bar yAxisId="left" dataKey="successRate" barSize={20} fill="#4ade80" name="Success Rate (%)" radius={[4, 4, 0, 0]} />
+                        {/* Success Rate (Bar) */}
+                        <Bar yAxisId="left" dataKey="successRate" barSize={20} fill="#4ade80" name="Success Rate (%)" radius={[4, 4, 0, 0]} />
 
-                    {/* Model Threshold (Line) */}
-                    <Line yAxisId="left" type="monotone" dataKey="threshold" stroke="#ff7300" strokeWidth={3} dot={{ r: 4 }} name="AI Model Threshold" />
-                </ComposedChart>
-            </ResponsiveContainer>
+                        {/* Model Threshold (Line) */}
+                        <Line yAxisId="left" type="monotone" dataKey="threshold" stroke="#ff7300" strokeWidth={3} dot={{ r: 4 }} name="AI Model Threshold" />
+                    </ComposedChart>
+                </ResponsiveContainer>
+            </div>
         </Card>
     );
 }

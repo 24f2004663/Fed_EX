@@ -89,28 +89,30 @@ export function AgencyCapacityAnalysis({ agencyId, currentScore, history }: Prop
         <Card className="mb-8 border-t-4 border-t-[var(--color-primary)]">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 {/* Visual Graph */}
-                <div className="md:col-span-2 h-64">
+                <div className="md:col-span-2 h-64 flex flex-col">
                     <h3 className="text-sm font-bold text-gray-500 mb-2 uppercase tracking-wide">12-Month Performance Trend</h3>
-                    <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={data}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9ca3af' }} />
-                            <YAxis domain={[0, 100]} hide />
-                            <Tooltip
-                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                cursor={{ stroke: '#cbd5e1', strokeWidth: 1 }}
-                            />
-                            <ReferenceLine y={80} stroke="#22c55e" strokeDasharray="3 3" label={{ value: 'Excellent (80%)', fill: '#22c55e', fontSize: 10 }} />
-                            <Line
-                                type="monotone"
-                                dataKey="score"
-                                stroke="var(--color-primary)"
-                                strokeWidth={3}
-                                dot={{ r: 4, fill: 'var(--color-primary)', strokeWidth: 2, stroke: '#fff' }}
-                                activeDot={{ r: 6 }}
-                            />
-                        </LineChart>
-                    </ResponsiveContainer>
+                    <div className="flex-1 min-h-0">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={data}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9ca3af' }} />
+                                <YAxis domain={[0, 100]} hide />
+                                <Tooltip
+                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                    cursor={{ stroke: '#cbd5e1', strokeWidth: 1 }}
+                                />
+                                <ReferenceLine y={80} stroke="#22c55e" strokeDasharray="3 3" label={{ value: 'Excellent (80%)', fill: '#22c55e', fontSize: 10 }} />
+                                <Line
+                                    type="monotone"
+                                    dataKey="score"
+                                    stroke="var(--color-primary)"
+                                    strokeWidth={3}
+                                    dot={{ r: 4, fill: 'var(--color-primary)', strokeWidth: 2, stroke: '#fff' }}
+                                    activeDot={{ r: 6 }}
+                                />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
                 </div>
 
                 {/* Derived Metrics Panel */}
