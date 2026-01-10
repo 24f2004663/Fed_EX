@@ -48,7 +48,8 @@ export async function uploadAgencyDataAction(formData: FormData) {
         const scriptPath = 'AnalyzeAgency.py';
         const args = ['--agency_id', agencyId, '--file', tempPath];
 
-        const pythonProcess = spawn('python', [path.join(process.cwd(), scriptPath), ...args]);
+        const pythonCommand = process.platform === "win32" ? "python" : "python3";
+        const pythonProcess = spawn(pythonCommand, [path.join(process.cwd(), scriptPath), ...args]);
 
         let output = '';
         const stream = pythonProcess.stdout;
