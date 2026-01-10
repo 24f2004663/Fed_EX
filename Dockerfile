@@ -30,4 +30,4 @@ RUN npm run build
 EXPOSE 3000
 
 # 9. Start the application
-CMD ["npm", "start"]
+CMD ["sh", "-c", "npx prisma db push && node prisma/simulate_pipeline.js && npm start"]
