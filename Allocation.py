@@ -3,16 +3,60 @@ import datetime
 import uuid
 import sys
 import argparse
+import json
+import os
 
 DB_PATH = 'prisma/dev.db'
+DATA_FILE = 'data/agencies.json'
 
 # --- AGENCY DEFINITIONS (Source of Truth) ---
-# Hardcoded capacity/score because Schema doesn't have 'Agency' table, only 'User'.
-AGENCIES = [
-    {'id': 'user-agency-alpha', 'name': 'Alpha Collections', 'score': 0.92, 'totalCapacity': 4, 'status': 'Established'},
-    {'id': 'user-agency-beta', 'name': 'Beta Recovery', 'score': 0.78, 'totalCapacity': 5, 'status': 'Established'},
-    {'id': 'user-agency-gamma', 'name': 'Gamma Partners', 'score': 0.60, 'totalCapacity': 3, 'status': 'Probationary'}
-]
+def load_agencies():
+    defaults = [
+        {'id': 'user-agency-alpha', 'name': 'Alpha Collections', 'score': 0.92, 'totalCapacity': 4, 'status': 'Established'},
+        {'id': 'user-agency-beta', 'name': 'Beta Recovery', 'score': 0.78, 'totalCapacity': 5, 'status': 'Established'},
+        {'id': 'user-agency-gamma', 'name': 'Gamma Partners', 'score': 0.60, 'totalCapacity': 3, 'status': 'Probationary'}
+    ]
+    
+    if not os.path.exists(DATA_FILE):
+        return defaults
+
+    try:
+        with open(DATA_FILE, 'r') as f:
+            data = json.load(f)
+            
+        dynamic_agencies = []
+        for a in data:
+            # Map JSON to Allocation Logic
+            # Default capacity logic based on score
+            score = a.get('score', 0)
+            
+            # Normalize score (JSON is 0-100, Allocation expects 0.0-1.0 potentially? 
+            # Looking at original code: 'score': 0.92. So yes, expects float 0-1.
+            # But wait, original code used 0.92. 
+            # JSON has 92.
+            # So divide by 100.
+            norm_score = score / 100.0
+            
+            capacity = 3
+            if score >= 85: capacity = 5
+            elif score >= 75: capacity = 4
+            
+            status = 'Established' if score > 60 else 'Probationary'
+            
+            dynamic_agencies.append({
+                'id': a['id'],
+                'name': a['name'],
+                'score': norm_score,
+                'totalCapacity': capacity, 
+                'status': status
+            })
+            
+        return dynamic_agencies
+    except Exception as e:
+        print(f"[Allocation.py] Warning: Failed to load agencies.json: {e}")
+        return defaults
+
+AGENCIES = load_agencies()
 
 def get_db_connection():
     # Set timeout to 5 seconds to prevent Next.js request timeout usually 10-15s
@@ -50,7 +94,7 @@ def get_agency_hp_load(conn, agency_id):
 def ingest_mock_data():
     conn = get_db_connection()
     try:
-        print("[Allocation.py] Starting Ingestion...")
+        print("[Allocation.py] Starting Ingestion with Agencies:", [a['name'] for a in AGENCIES])
         
         # 1. Clean Slate (Optional: or just append)
         conn.execute("DELETE FROM AuditLog")
@@ -61,12 +105,11 @@ def ingest_mock_data():
         
         # 2. SEED USERS (Agencies & Manager)
         # Creating valid foreign key targets for assignedToId
-        users_to_seed = [
-            ('user-agency-alpha', 'AGENCY', 'Alpha Collections'),
-            ('user-agency-beta', 'AGENCY', 'Beta Recovery'),
-            ('user-agency-gamma', 'AGENCY', 'Gamma Partners'),
-            ('user-internal-mgr', 'MANAGER', 'FedEx Manager')
-        ]
+        users_to_seed = []
+        for ag in AGENCIES:
+            users_to_seed.append((ag['id'], 'AGENCY', ag['name']))
+            
+        users_to_seed.append(('user-internal-mgr', 'MANAGER', 'FedEx Manager'))
         
         for uid, role, name in users_to_seed:
             email = f"{name.lower().replace(' ', '.')}@example.com"
@@ -75,18 +118,27 @@ def ingest_mock_data():
                 (uid, email, name, role)
             )
 
-        # 3. Generate Queue (14 Cases)
-        # 4 High, 5 Medium, 5 Low
-        raw_queue = []
-        priorities = ['HIGH'] * 4 + ['MEDIUM'] * 5 + ['LOW'] * 5
-        scores = [95, 92, 88, 85, 75, 70, 65, 60, 55, 45, 40, 35, 30, 25] 
+        # 3. Generate Queue
+        # Scale cases based on agency count? 
+        # If we have many agencies, we need more cases to verify allocation.
+        # Base 14 cases for 3 agencies (~4.6/agency)
+        # Let's do 5 * num_agencies
         
-        for i in range(14):
+        num_cases = max(14, len(AGENCIES) * 4)
+        raw_queue = []
+        
+        for i in range(num_cases):
             idx = i + 1
-            p = priorities[i]
-            score = float(scores[i]) # Explicit Float
-            # Explicit Float for amount
-            amount = 50000.0 + idx*1000.0 if p == 'HIGH' else (10000.0 + idx*100.0 if p == 'MEDIUM' else 2000.0 + idx*50.0)
+            # Round robin priority distribution: High, Medium, Low
+            p_idx = i % 3
+            p = ['HIGH', 'MEDIUM', 'LOW'][p_idx]
+            
+            # Score logic
+            score = 95 - (i * 2)
+            if score < 20: score = 20
+            
+            amount = 50000.0 - (i * 1000)
+            if amount < 1000: amount = 1000
             
             # Due date relative to now for realism (using UTC)
             due_date = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)).isoformat().split('T')[0]
@@ -96,32 +148,40 @@ def ingest_mock_data():
                 'invId': f"INV-2026-{str(idx).zfill(3)}",
                 'amount': amount,
                 'priority': p,
-                'aiScore': score,
+                'aiScore': float(score),
                 'dueDate': due_date 
             })
             
         assignments = {} # case_id -> agency_id
 
-        # 4. Reserve for Probationary (10%)
-        reserve_count = 2 # ceil(1.4)
+        # 4. Reserve for Probationary (10% of total queue)
+        reserve_count = max(1, int(num_cases * 0.10))
         main_queue = list(raw_queue)
-        newbie = next((a for a in AGENCIES if a['status'] == 'Probationary'), None)
+        newbies = [a for a in AGENCIES if a['status'] == 'Probationary']
         
-        if newbie:
+        if newbies:
             booked = 0
             # Iterate backwards to safely pop
             for i in range(len(main_queue) - 1, -1, -1):
                 if booked >= reserve_count: break
                 c = main_queue[i]
                 if c['priority'] == 'MEDIUM':
-                     assignments[c['id']] = newbie['id']
+                     # Round robin assign to newbies
+                     target_newbie = newbies[booked % len(newbies)]
+                     assignments[c['id']] = target_newbie['id']
                      booked += 1
                      main_queue.pop(i)
 
         # 5. Main Allocation
         sorted_agencies = sorted(AGENCIES, key=lambda x: x['score'], reverse=True)
         
+        # CRITICAL FIX: Sort queue by Priority (High -> Medium -> Low)
+        # This ensures High Priority cases are processed first and never left in queue if capacity exists.
+        priority_map = {'HIGH': 0, 'MEDIUM': 1, 'LOW': 2}
+        main_queue.sort(key=lambda x: priority_map[x['priority']])
+        
         for case_item in main_queue:
+            assigned = False
             for agency in sorted_agencies:
                 # Calc Realtime Load simulation (base 0 + assigned in this script)
                 batch_assigned = sum(1 for cid, aid in assignments.items() if aid == agency['id'])
@@ -145,7 +205,10 @@ def ingest_mock_data():
                         continue
                 
                 assignments[case_item['id']] = agency['id']
+                assigned = True
                 break
+            
+            # If not assigned, it stays in queue (automatically handled by logic below)
         
         # 6. Commit to DB
         # Strict ISO with 3-digit milliseconds for Prisma compatibility

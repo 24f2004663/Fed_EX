@@ -5,6 +5,7 @@ import { Card } from '@/components/Card';
 import { Badge } from '@/components/Badge';
 import { DollarSign, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 import { HistoricalPerformanceGraph } from '@/components/HistoricalPerformanceGraph';
+import { AgencyAdministrationCard } from '@/components/AgencyAdministrationCard';
 
 async function getDashboardData() {
   // Fetch Data (simulating "Agency Daemon" & "Scoring Service" output)
@@ -130,24 +131,10 @@ export default async function DashboardPage() {
       {/* 3. Live Activity Monitor (Moved Up) */}
       <h2 className="text-lg font-bold text-gray-800 mb-4">Live Activity Monitor</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+
+
         {/* Agency Performance */}
-        <Card>
-          <h3 className="text-sm font-bold text-[var(--color-secondary)] mb-4">Agency Performance</h3>
-          <div className="space-y-4">
-            <div className="flex justify-between text-sm">
-              <span>Alpha Collections</span>
-              <span className="font-bold text-green-600">92%</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span>Beta Recovery</span>
-              <span className="font-bold text-yellow-600">78%</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span>Gamma Partners</span>
-              <span className="font-bold text-orange-600">60%</span>
-            </div>
-          </div>
-        </Card>
+        <AgencyAdministrationCard />
 
         {/* SLA Breaches */}
         <Card>

@@ -6,6 +6,7 @@ import { AgencyActionButtons } from '@/components/AgencyActionButtons';
 import LogoutButton from '@/components/LogoutButton';
 import { cookies } from 'next/headers';
 import { AgencyCapacityAnalysis } from '@/components/AgencyCapacityAnalysis';
+import { getAgencyById } from '@/lib/agencyStore'; // Import from store
 
 export const dynamic = 'force-dynamic';
 
@@ -39,19 +40,12 @@ export default async function AgencyPortalPage() {
     const agencyId = session?.agencyId;
     const cases = await getAgencyCases(agencyId);
 
-    // Dynamic Header Name
-    const agencyNameMap: Record<string, string> = {
-        'user-agency-alpha': 'Alpha Collections',
-        'user-agency-beta': 'Beta Recovery',
-        'user-agency-gamma': 'Gamma Partners'
-    };
+    // Fetch Real Agency Details from Store
+    const agencyDetails = agencyId ? getAgencyById(agencyId) : null;
 
-    const currentAgencyName = agencyId ? agencyNameMap[agencyId] : 'Unauthorized View';
-
-    // Calculate Score (Number)
-    let score = 60;
-    if (agencyId === 'user-agency-alpha') score = 92;
-    else if (agencyId === 'user-agency-beta') score = 78;
+    const currentAgencyName = agencyDetails ? agencyDetails.name : 'Unauthorized View';
+    const score = agencyDetails ? agencyDetails.score : 0;
+    const history = agencyDetails ? agencyDetails.history : [];
 
     // Split Cases
     const newAllocations = cases.filter((c: any) => c.status === 'ASSIGNED');
@@ -85,7 +79,7 @@ export default async function AgencyPortalPage() {
             </header>
 
             {/* Performance & Capacity Analysis */}
-            {agencyId && <AgencyCapacityAnalysis agencyId={agencyId} currentScore={score} />}
+            {agencyId && <AgencyCapacityAnalysis agencyId={agencyId} currentScore={score} history={history} />}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Block 1: New Allocations */}

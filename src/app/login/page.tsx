@@ -4,12 +4,23 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { User, Lock, ArrowRight, Eye, EyeOff, ChevronDown, Search } from 'lucide-react';
 import { loginUser } from '@/app/auth-actions';
+import { getAgenciesAction } from '@/app/agency/actions'; // Fetch from store
 import clsx from 'clsx';
+
+interface Agency {
+    id: string;
+    name: string;
+    score: number;
+}
 
 export default function LoginPage() {
     const router = useRouter();
     const [role, setRole] = useState<'ENTERPRISE' | 'AGENCY'>('ENTERPRISE');
-    const [agency, setAgency] = useState<'ALPHA' | 'BETA' | 'GAMMA'>('ALPHA');
+
+    // Dynamic Agency State
+    const [availableAgencies, setAvailableAgencies] = useState<Agency[]>([]);
+    const [selectedAgency, setSelectedAgency] = useState<Agency | null>(null);
+
     const [showPassword, setShowPassword] = useState(false);
 
     // Custom Dropdown State
@@ -17,9 +28,25 @@ export default function LoginPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    const agencyOptions = ['ALPHA', 'BETA', 'GAMMA'] as const;
-    const filteredAgencies = agencyOptions.filter(a =>
-        a.toLowerCase().includes(searchQuery.toLowerCase())
+    // Fetch Agencies on Load
+    useEffect(() => {
+        const fetchAgencies = async () => {
+            try {
+                const data = await getAgenciesAction();
+                setAvailableAgencies(data);
+                // Select first one by default if available
+                if (data.length > 0) {
+                    setSelectedAgency(data[0]);
+                }
+            } catch (error) {
+                console.error("Failed to fetch agencies for login", error);
+            }
+        };
+        fetchAgencies();
+    }, []);
+
+    const filteredAgencies = availableAgencies.filter(a =>
+        a.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     // Close dropdown on click outside
@@ -33,31 +60,10 @@ export default function LoginPage() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // Pre-filled credentials logic
-    const credentials = {
-        ENTERPRISE: { username: 'admin', password: 'admin@123' },
-        AGENCY: {
-            ALPHA: { username: 'demo_alpha', password: 'demo@123' },
-            BETA: { username: 'demo_beta', password: 'demo@123' },
-            GAMMA: { username: 'demo_gamma', password: 'demo@123' }
-        }
-    };
-
-    const currentCreds = role === 'ENTERPRISE'
-        ? credentials.ENTERPRISE
-        : credentials.AGENCY[agency];
-
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Map Selection to Database ID
-        const agencyMap = {
-            ALPHA: 'user-agency-alpha',
-            BETA: 'user-agency-beta',
-            GAMMA: 'user-agency-gamma'
-        };
-
-        const agencyId = role === 'AGENCY' ? agencyMap[agency] : undefined;
+        const agencyId = role === 'AGENCY' && selectedAgency ? selectedAgency.id : undefined;
 
         // Call Server Action to set Cookie
         const result = await loginUser(role, agencyId);
@@ -120,7 +126,7 @@ export default function LoginPage() {
                                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                                 className="w-full pl-4 pr-10 py-3 bg-orange-50 border border-orange-200 rounded-lg text-[var(--color-secondary)] font-bold focus:outline-none focus:ring-2 focus:ring-[var(--color-secondary)] text-left flex items-center justify-between transition-all"
                             >
-                                <span>{agency} Collections</span>
+                                <span>{selectedAgency ? selectedAgency.name : 'Select Agency...'}</span>
                                 <ChevronDown className={clsx("w-5 h-5 text-orange-400 transition-transform", isDropdownOpen && "rotate-180")} />
                             </button>
 
@@ -147,19 +153,19 @@ export default function LoginPage() {
                                         {filteredAgencies.length > 0 ? (
                                             filteredAgencies.map((a) => (
                                                 <button
-                                                    key={a}
+                                                    key={a.id}
                                                     type="button"
                                                     onClick={() => {
-                                                        setAgency(a);
+                                                        setSelectedAgency(a);
                                                         setIsDropdownOpen(false);
                                                         setSearchQuery('');
                                                     }}
                                                     className={clsx(
                                                         "w-full text-left px-4 py-3 hover:bg-orange-50 text-sm transition-colors flex items-center gap-2",
-                                                        agency === a ? "text-[var(--color-secondary)] font-bold bg-orange-50/50" : "text-gray-600"
+                                                        selectedAgency?.id === a.id ? "text-[var(--color-secondary)] font-bold bg-orange-50/50" : "text-gray-600"
                                                     )}
                                                 >
-                                                    {a} Collections
+                                                    {a.name}
                                                 </button>
                                             ))
                                         ) : (
@@ -182,7 +188,7 @@ export default function LoginPage() {
                                     <input
                                         type="text"
                                         readOnly
-                                        value={currentCreds.username}
+                                        value="admin"
                                         className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] text-gray-700 font-mono"
                                     />
                                 </div>
@@ -197,7 +203,7 @@ export default function LoginPage() {
                                 <input
                                     type={showPassword ? "text" : "password"}
                                     readOnly
-                                    value={currentCreds.password}
+                                    value={role === 'ENTERPRISE' ? "admin@123" : "demo@123"}
                                     className="w-full pl-10 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] text-gray-700 font-mono"
                                 />
                                 <button

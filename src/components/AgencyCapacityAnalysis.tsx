@@ -16,12 +16,15 @@ import { Badge } from './Badge';
 interface Props {
     agencyId: string;
     currentScore: number; // 0-100
+    history?: number[]; // Performance History
 }
 
-export function AgencyCapacityAnalysis({ agencyId, currentScore }: Props) {
+export function AgencyCapacityAnalysis({ agencyId, currentScore, history }: Props) {
     // 1. Logic for Thresholds
     // "collection threshold: alpha = 4, beta = 5, gamma = 3"
-    let baseCapacity = 3; // Default/Newbie
+    // Default to 1 if new (score 0), else 3
+    let baseCapacity = currentScore > 0 ? 3 : 1;
+
     if (agencyId === 'user-agency-alpha') baseCapacity = 4;
     else if (agencyId === 'user-agency-beta') baseCapacity = 5;
     else if (agencyId === 'user-agency-gamma') baseCapacity = 3;
@@ -43,22 +46,43 @@ export function AgencyCapacityAnalysis({ agencyId, currentScore }: Props) {
         hpReason = "Moderate Performance (50-80%)";
     }
 
-    // 2. Mock Historical Data
-    // We'll generate a curve that ends at the current Score
+    // 2. Mock or Real Historical Data
     const data = [];
-    for (let i = 11; i >= 0; i--) {
-        const date = new Date();
-        date.setMonth(date.getMonth() - i);
-        const monthName = date.toLocaleString('default', { month: 'short' });
+    // If history prop is provided, use it
+    if (history && history.length > 0) {
+        for (let i = 0; i < history.length; i++) {
+            const date = new Date();
+            // date.setMonth(date.getMonth() - (history.length - 1 - i));
+            // Assuming history is [oldest ... newest]
+            // Actually, usually mocks are generated backwards. 
+            // Let's assume history[last] is current.
 
-        // Random variance but trending towards currentScore
-        const variance = Math.random() * 10 - 5;
-        const yearTrend = currentScore - (i * 2); // Slightly lower in past
+            // Let's generate labels based on index relative to now
+            const offset = history.length - 1 - i;
+            date.setMonth(date.getMonth() - offset);
+            const monthName = date.toLocaleString('default', { month: 'short' });
 
-        data.push({
-            name: monthName,
-            score: Math.min(100, Math.max(0, Math.floor(yearTrend + variance)))
-        });
+            data.push({
+                name: monthName,
+                score: history[i]
+            });
+        }
+    } else {
+        // Fallback Mock (should not happen if store is correct)
+        for (let i = 11; i >= 0; i--) {
+            const date = new Date();
+            date.setMonth(date.getMonth() - i);
+            const monthName = date.toLocaleString('default', { month: 'short' });
+
+            // Random variance but trending towards currentScore
+            const variance = Math.random() * 10 - 5;
+            const yearTrend = currentScore - (i * 2);
+
+            data.push({
+                name: monthName,
+                score: Math.min(100, Math.max(0, Math.floor(yearTrend + variance)))
+            });
+        }
     }
 
     return (
