@@ -48,6 +48,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/*.txt ./
 # Copy data directory if it exists
 COPY --from=builder --chown=nextjs:nodejs /app/data ./data
 
+# Install Prisma globally in runner to ensure CLI availability
+RUN npm install -g prisma@5.10.2
+
 USER nextjs
 
 EXPOSE 3000
@@ -58,4 +61,5 @@ ENV HOME=/tmp
 # Note: In standalone mode, we run 'node server.js'.
 # However, we also need to seed the DB.
 # We chain the commands.
-CMD ["sh", "-c", "./node_modules/.bin/prisma db push && node prisma/simulate_pipeline.js && node server.js"]
+# We use the globally installed prisma CLI to avoid relying on node_modules location in standalone build
+CMD ["sh", "-c", "prisma db push && node prisma/simulate_pipeline.js && node server.js"]
