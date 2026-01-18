@@ -101,20 +101,29 @@ export async function deleteAgencyAdmin(id: string) {
     try {
         await getAdminUser();
 
-        // Soft Delete
-        await prisma.agency.update({
-            where: { id },
-            data: {
-                status: 'INACTIVE',
-                deletedAt: new Date()
-            }
-        });
+        // Hard Delete with cleanup
+        await prisma.$transaction([
+            // 1. Delete Performance Records
+            prisma.agencyPerformance.deleteMany({
+                where: { agencyId: id }
+            }),
+            // 2. Unlink Users (or delete them? Unlinking is safer)
+            prisma.user.updateMany({
+                where: { agencyId: id },
+                data: { agencyId: null }
+            }),
+            // 3. Delete Agency
+            prisma.agency.delete({
+                where: { id }
+            })
+        ]);
 
-        await audit("DELETE_AGENCY", `Soft deleted agency ${id}`);
+        await audit("DELETE_AGENCY", `Hard deleted agency ${id}`);
         revalidatePath('/admin/agencies');
         return ok();
     } catch (e: any) {
-        return fail("Delete failed");
+        console.error("[deleteAgencyAdmin] Error:", e);
+        return fail("Delete failed: " + e.message);
     }
 }
 

@@ -31,6 +31,12 @@ Instead of random assignment, our system uses a **weighted, performance-based al
     *   **High Priority Cases** (> $50k) are **exclusively** routed to agencies with >80% performance scores.
     *   **Low Performance Penalty**: Agencies dropping below 50% are cut off from High Priority allocations automatically.
 
+> [!NOTE]
+> **Architecture Demo**: The `AnalyzeAgency.py` component acts as a **Simulated AI Module** for this hackathon, returning deterministic "AI-generated" insights. In production, this would be backed by a trained ML model (RandomForest/XGBoost).
+
+> [!TIP]
+> **Microservice Pattern**: The application uses a decoupled **Python Worker** pattern. Node.js handles the API and User Interface, while Python scripts execute complex data processing and allocation logic asynchronously. This separation ensures the UI remains responsive.
+
 ### 2. The Agency Portal
 A specialized interface for external partners to view their work without accessing sensitive FedEx internal data.
 *   **Actions**: "Accept", "Reject", "Upload Proof", "Log Promise to Pay".
