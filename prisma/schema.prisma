@@ -21,6 +21,7 @@ model User {
   agencyId       String?
   agency         Agency? @relation(fields: [agencyId], references: [id])
   cases          Case[]
+  passwordHash   String? // Added for local auth
 }
 
 model Agency {
