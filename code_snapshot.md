@@ -1,5 +1,5 @@
 # Code Snapshot
-Generated on 2026-01-18T06:56:57.042Z
+Generated on 2026-01-18T07:04:54.505Z
 
 ## File: Allocation.py
 ```py
@@ -627,7 +627,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip3 install -r requirements.txt
+RUN pip3 install -r requirements.txt --break-system-packages
 
 # 2. Dependencies
 FROM base AS deps
