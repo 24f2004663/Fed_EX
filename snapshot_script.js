@@ -6,7 +6,7 @@ const projectRoot = process.cwd();
 
 const excludeDirs = ['node_modules', '.next', '.git', '.vscode', 'dist', 'build', 'coverage', '.gemini', 'tmp'];
 const excludeFiles = ['code_snapshot.md', 'code_snapshot_temp.md', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'next-env.d.ts', '.DS_Store', 'Thumbs.db', 'snapshot_script.js', 'snapshot_script.ps1'];
-const includeExtensions = ['.ts', '.tsx', '.js', '.jsx', '.json', '.md', '.py', '.sql', '.css', '.html', '.dockerfile', '.yml', '.yaml'];
+const includeExtensions = ['.ts', '.tsx', '.js', '.jsx', '.json', '.md', '.py', '.sql', '.css', '.html', '.dockerfile', '.yml', '.yaml', '.txt'];
 
 function isExcluded(filePath) {
     const relativePath = path.relative(projectRoot, filePath);

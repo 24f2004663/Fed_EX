@@ -1,5 +1,5 @@
 # Code Snapshot
-Generated on 2026-01-18T07:38:27.973Z
+Generated on 2026-01-18T07:43:38.804Z
 
 ## File: Allocation.py
 ```py
@@ -1374,6 +1374,27 @@ export default nextConfig;
 }
 ```
 
+## File: performance_data.txt
+```txt
+Agency Performance Report 2025
+Target: MANOJ Agency
+Period: Q4 2025
+
+Summary:
+The agency has shown exceptional recovery rates this quarter.
+Client satisfaction is high.
+
+Metrics:
+- Total Recovered: $1.2M
+- Claims handled: 450
+- Performance Score: 98
+- Capacity: 15
+
+Recommendations:
+Increase allocation tiers immediately.
+
+```
+
 ## File: postcss.config.js
 ```js
 module.exports = {
@@ -1762,6 +1783,15 @@ A daemon process that monitors case aging.
 *   **AI Simulation**:
     *   Checks the filename for the keyword "invalid". If found, returns `False` (simulating a detected forgery).
     *   Otherwise, returns `True` with a high confidence score (e.g., 0.98), simulating a successful match of date and invoice amount.
+
+```
+
+## File: requirements.txt
+```txt
+psycopg2-binary
+requests
+pandas
+numpy
 
 ```
 
