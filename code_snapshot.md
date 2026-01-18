@@ -1,5 +1,5 @@
 # Code Snapshot
-Generated on 2026-01-18T02:01:50.168Z
+Generated on 2026-01-18T05:45:21.455Z
 
 ## File: Allocation.py
 ```py
@@ -676,10 +676,8 @@ ENV HOSTNAME="0.0.0.0"
 ENV HOME=/tmp
 
 # Note: In standalone mode, we run 'node server.js'.
-# However, we also need to seed the DB.
-# We chain the commands.
-# We use the globally installed prisma CLI to avoid relying on node_modules location in standalone build
-CMD ["sh", "-c", "prisma db push --skip-generate && node prisma/simulate_pipeline.js && node server.js"]
+# Database migrations/seeding should be done via deploy hooks or CI/CD, not on container boot.
+CMD ["node", "server.js"]
 
 ```
 
@@ -6047,22 +6045,44 @@ export async function runPythonBackground(
 
 ## File: src\lib\queue.ts
 ```ts
-import { Queue } from 'bullmq';
-import IORedis from 'ioredis';
-
-const connection = {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379'),
-};
+let allocationQueue: any = null;
+let ingestionQueue: any = null;
 
 export const JOB_QUEUES = {
-    ALLOCATION: 'allocation-queue',
-    INGESTION: 'ingestion-queue',
+  ALLOCATION: 'allocation-queue',
+  INGESTION: 'ingestion-queue',
 };
 
-// Create Queues
-export const allocationQueue = new Queue(JOB_QUEUES.ALLOCATION, { connection });
-export const ingestionQueue = new Queue(JOB_QUEUES.INGESTION, { connection });
+// Only initialize queues if REDIS_URL exists
+const redisUrl = process.env.REDIS_URL;
+const redisHost = process.env.REDIS_HOST;
+const redisPort = process.env.REDIS_PORT;
+
+const isRedisConfigured = !!redisUrl || !!redisHost;
+
+if (isRedisConfigured) {
+  const { Queue } = require('bullmq');
+  const IORedis = require('ioredis');
+
+  let connection;
+  if (redisUrl) {
+    connection = new IORedis(redisUrl, { maxRetriesPerRequest: null });
+  } else {
+    connection = new IORedis({
+      host: redisHost || 'localhost',
+      port: parseInt(redisPort || '6379'),
+    });
+  }
+
+  allocationQueue = new Queue(JOB_QUEUES.ALLOCATION, { connection });
+  ingestionQueue = new Queue(JOB_QUEUES.INGESTION, { connection });
+
+  console.log('[Queue] Redis connected');
+} else {
+  console.warn('[Queue] Redis not configured — queues disabled');
+}
+
+export { allocationQueue, ingestionQueue };
 
 ```
 
@@ -6499,38 +6519,57 @@ import IORedis from 'ioredis';
 import { exec } from 'child_process';
 import util from 'util';
 import path from 'path';
+import { EventEmitter } from 'events';
 
 const execAsync = util.promisify(exec);
-
-const connection = {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379'),
-};
 
 const JOB_QUEUES = {
     ALLOCATION: 'allocation-queue',
     INGESTION: 'ingestion-queue',
 };
 
+// --- REDIS CONNECTION LOGIC ---
+const redisUrl = process.env.REDIS_URL;
+const redisHost = process.env.REDIS_HOST;
+const redisPort = process.env.REDIS_PORT;
+
+// Only connect if explicit config is present
+const isRedisConfigured = !!redisUrl || !!redisHost;
+
+let connection: any;
+if (isRedisConfigured) {
+    if (redisUrl) {
+        // Render / Production URL style
+        connection = new IORedis(redisUrl, { maxRetriesPerRequest: null });
+    } else {
+        // Local / Env var style
+        connection = {
+            host: redisHost || 'localhost',
+            port: parseInt(redisPort || '6379'),
+        };
+    }
+} else {
+    console.warn('[Worker] No Redis configuration found (REDIS_URL or REDIS_HOST). Workers will be disabled.');
+}
+
 async function executePythonScript(scriptName: string, args: string[] = []) {
     try {
         const scriptPath = path.resolve(process.cwd(), scriptName);
         const pythonCommand = process.platform === 'win32' ? 'python' : 'python3';
-        
+
         // Construct args string safely
-        // In a real app we'd use spawn for better safety, but for this demo:
-        const argsStr = args.map(a => `"${a}"`).join(' '); // Simple quoting
-        
+        const argsStr = args.map(a => `"${a}"`).join(' ');
+
         console.log(`Starting background job: ${scriptName} [${argsStr}]`);
-        
+
         const { stdout, stderr } = await execAsync(`${pythonCommand} "${scriptPath}" ${argsStr}`, {
             env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL || "postgresql://admin:adminpassword@localhost:5432/fedex_recovery" }
         });
-        
+
         if (stderr) {
             console.warn(`Script stderr: ${stderr}`);
         }
-        
+
         console.log(`Job completed: ${scriptName}`);
         return stdout;
     } catch (error) {
@@ -6539,8 +6578,16 @@ async function executePythonScript(scriptName: string, args: string[] = []) {
     }
 }
 
+// Ensure we don't crash if Redis is missing
+function createWorker(queueName: string, processor: (job: Job) => Promise<any>): any {
+    if (!isRedisConfigured) {
+        return new EventEmitter(); // Return dummy emitter to satisfy listeners in worker.ts
+    }
+    return new Worker(queueName, processor, { connection });
+}
+
 // Worker for Allocation Jobs
-export const allocationWorker = new Worker(
+export const allocationWorker = createWorker(
     JOB_QUEUES.ALLOCATION,
     async (job: Job) => {
         console.log(`Processing Allocation Job ${job.id}`);
@@ -6548,12 +6595,11 @@ export const allocationWorker = new Worker(
         const args = job.data.args || [];
         await executePythonScript('Allocation.py', args);
         return { status: 'completed' };
-    },
-    { connection }
+    }
 );
 
 // Worker for Ingestion Jobs
-export const ingestionWorker = new Worker(
+export const ingestionWorker = createWorker(
     JOB_QUEUES.INGESTION,
     async (job: Job) => {
         console.log(`Processing Ingestion Job ${job.id}`);
@@ -6561,8 +6607,7 @@ export const ingestionWorker = new Worker(
         // Ingestion also maps to Allocation.py --mode ingest for this project
         await executePythonScript('Allocation.py', args);
         return { status: 'ingested' };
-    },
-    { connection }
+    }
 );
 
 ```
@@ -6727,15 +6772,15 @@ import { allocationWorker, ingestionWorker } from './src/workers/python-worker';
 
 console.log('🚀 Worker Service Started...');
 
-allocationWorker.on('completed', (job) => {
+allocationWorker.on('completed', (job: any) => {
     console.log(`✅ Allocation Job ${job.id} completed!`);
 });
 
-allocationWorker.on('failed', (job, err) => {
+allocationWorker.on('failed', (job: any, err: any) => {
     console.error(`❌ Allocation Job ${job?.id} failed:`, err);
 });
 
-ingestionWorker.on('completed', (job) => {
+ingestionWorker.on('completed', (job: any) => {
     console.log(`✅ Ingestion Job ${job.id} completed!`);
 });
 
