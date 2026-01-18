@@ -62,7 +62,7 @@ def load_agencies():
         cur.close()
         conn.close()
 
-AGENCIES = load_agencies()
+# AGENCIES global removed. Load locally in functions.
 
 # --- HELPER: LOG AUDIT ---
 def log_audit(cur, case_id, actor_id, action, details):
@@ -93,28 +93,37 @@ def ingest_mock_data():
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        print("[Allocation.py] Starting Ingestion with Agencies:", [a['name'] for a in AGENCIES])
+    try:
+        agencies = load_agencies()
+        print("[Allocation.py] Starting Ingestion with Agencies:", [a['name'] for a in agencies])
         
-        # 1. Clean Slate (Use correct table case/quotes for Postgres)
+        # 1. Clean Slate (SAFE DELETE)
+        # STOP deleting "User" or "Agency" tables to preserve Auth/Config
         cur.execute('DELETE FROM "AuditLog"')
         cur.execute('DELETE FROM "SLA"')
         cur.execute('DELETE FROM "Case"')
         cur.execute('DELETE FROM "Invoice"')
-        cur.execute('DELETE FROM "User"')
+        # cur.execute('DELETE FROM "AgencyPerformance"') # Optional: decide if perf history wipes on reset
         
-        # 2. SEED USERS (Agencies & Manager)
+        # 2. SEED USERS (Agencies & Manager) - Upsert/Safe
         users_to_seed = []
-        for ag in AGENCIES:
+        for ag in agencies:
+            # We assume Agency ID matches expected User ID pattern or we use generic
+            # For this hackathon, we sync them. 
             users_to_seed.append((ag['id'], 'AGENCY', ag['name']))
             
         users_to_seed.append(('user-internal-mgr', 'MANAGER', 'FedEx Manager'))
         
         for uid, role, name in users_to_seed:
             email = f"{name.lower().replace(' ', '.')}@example.com"
-            cur.execute(
-                'INSERT INTO "User" ("id", "email", "name", "role") VALUES (%s, %s, %s, %s)',
-                (uid, email, name, role)
-            )
+            try:
+                cur.execute(
+                    'INSERT INTO "User" ("id", "email", "name", "role") VALUES (%s, %s, %s, %s) ON CONFLICT ("email") DO NOTHING',
+                    (uid, email, name, role)
+                )
+            except Exception as user_e:
+                print(f"Warning seeding user {name}: {user_e}")
+
 
         # 3. Generate Queue
         num_cases = 20 # User requested strict cap at 20 invoices regardless of agency count
@@ -149,7 +158,7 @@ def ingest_mock_data():
         # 4. Reserve for Probationary
         reserve_count = max(1, int(num_cases * 0.10))
         main_queue = list(raw_queue)
-        newbies = [a for a in AGENCIES if a['status'] == 'Probationary']
+        newbies = [a for a in agencies if a['status'] == 'Probationary']
         
         if newbies:
             booked = 0
@@ -163,14 +172,15 @@ def ingest_mock_data():
                      main_queue.pop(i)
 
         # 5. Main Allocation
-        sorted_agencies = sorted(AGENCIES, key=lambda x: x['score'], reverse=True)
+        sorted_agencies = sorted(agencies, key=lambda x: x['score'], reverse=True)
         priority_map = {'HIGH': 0, 'MEDIUM': 1, 'LOW': 2}
         main_queue.sort(key=lambda x: priority_map[x['priority']])
         
         for case_item in main_queue:
             for agency in sorted_agencies:
+                current_db_load = get_agency_load(cur, agency['id'])
                 batch_assigned = sum(1 for cid, aid in assignments.items() if aid == agency['id'])
-                if batch_assigned >= agency['totalCapacity']: 
+                if (current_db_load + batch_assigned) >= agency['totalCapacity']: 
                     continue
                 
                 # HP Threshold logic
@@ -294,7 +304,8 @@ def reallocate_case(case_id, rejected_by_agency_id):
         rejected_agency_ids = {r['actorId'] for r in past_rejectors_rows}
         rejected_agency_ids.add(rejected_by_agency_id)
         
-        candidates = [a for a in AGENCIES if a['id'] not in rejected_agency_ids]
+        agencies = load_agencies()
+        candidates = [a for a in agencies if a['id'] not in rejected_agency_ids]
         candidates.sort(key=lambda x: x['score'], reverse=True)
             
         chosen_agency = None
@@ -360,6 +371,7 @@ def check_sla_breaches():
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         print("[Allocation.py] Checking SLA Breaches...")
+        agencies = load_agencies()
         
         cur.execute('SELECT * FROM "Case" WHERE "status" = \'ASSIGNED\' AND "currentSLAStatus" = \'ACTIVE\'')
         rows = cur.fetchall()
@@ -392,7 +404,7 @@ def check_sla_breaches():
                 
                 agency_name = "Unknown Agency"
                 if row['assignedToId']:
-                    ag = next((a for a in AGENCIES if a['id'] == row['assignedToId']), None)
+                    ag = next((a for a in agencies if a['id'] == row['assignedToId']), None)
                     if ag: agency_name = ag['name']
                 
                 log_audit(cur, row['id'], 'SYSTEM_DAEMON', 'SLA_BREACH', f"Offer revoked. Timeout > {limit}h. Agency {agency_name} penalized.")
@@ -400,6 +412,10 @@ def check_sla_breaches():
                 
         conn.commit()
         print(f"[Allocation.py] SLA Check Complete. Revoked: {revoked_count}")
+        
+        if revoked_count > 0:
+            print("[Allocation.py] Triggering immediate reallocation for revoked cases...")
+            allocate_existing_cases()
 
     except Exception as e:
         print(f"Error in SLA Check: {e}")
@@ -440,7 +456,8 @@ def allocate_existing_cases():
         # Logic: Reserve for Probationary
         reserve_count = max(1, int(len(main_queue) * 0.10))
         queue_copy = list(main_queue) 
-        newbies = [a for a in AGENCIES if a['status'] == 'Probationary']
+        agencies = load_agencies()
+        newbies = [a for a in agencies if a['status'] == 'Probationary']
         
         if newbies:
             booked = 0
@@ -454,7 +471,7 @@ def allocate_existing_cases():
                      queue_copy.pop(i)
 
         # Logic: Main Allocation
-        sorted_agencies = sorted(AGENCIES, key=lambda x: x['score'], reverse=True)
+        sorted_agencies = sorted(agencies, key=lambda x: x['score'], reverse=True)
         priority_map = {'HIGH': 0, 'MEDIUM': 1, 'LOW': 2}
         
         def get_prio(x):
