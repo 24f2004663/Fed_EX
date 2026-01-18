@@ -328,9 +328,9 @@ export async function testAndSyncDatabase(config: any) {
 
         console.warn(`[Sync] Real connection failed: ${error.message}.`);
 
-        // Fallback for DEMO: If user enters "demo" as host, we allow it.
-        if (config.host === 'demo' || config.host === '127.0.0.1' || config.host === 'localhost') {
-            console.log("[Sync] Demo/Localhost mode fallback activated.");
+        // Fallback for DEMO: Only if user explicitly enters "demo"
+        if (config.host === 'demo') {
+            console.log("[Sync] Demo mode activated.");
             await new Promise(resolve => setTimeout(resolve, 1500));
             await ingestMockData();
             return { success: true };
