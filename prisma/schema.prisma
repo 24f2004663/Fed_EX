@@ -30,6 +30,8 @@ model Agency {
   status    String   @default("ACTIVE") // ACTIVE, INACTIVE
   capacity  Int      @default(5)
   region    String   @default("NA")
+  tier      String   @default("STANDARD") // STANDARD, PREFERRED
+  score     Float    @default(0)          // Current live score
   deletedAt DateTime?
 
   users       User[]
@@ -49,6 +51,8 @@ model AgencyPerformance {
   avgDSO       Float
   
   createdAt    DateTime @default(now())
+
+  @@unique([agencyId, month])
 }
 
 model Invoice {
@@ -93,10 +97,12 @@ model Case {
 
 model AuditLog {
   id        String   @id @default(uuid())
-  caseId    String
-  case      Case     @relation(fields: [caseId], references: [id])
+  caseId    String?  // Optional to allow system/agency logs
+  case      Case?    @relation(fields: [caseId], references: [id]) // Optional
   
+  entityType String  @default("CASE") // CASE, AGENCY, SYSTEM
   actorId   String
+  actorRole String?  // ADMIN, AGENCY, SYSTEM
   action    String   // NOTE, STATUS_CHANGE, ASSIGN, UPLOAD, PTP, DISPUTE
   details   String
   timestamp DateTime @default(now())
