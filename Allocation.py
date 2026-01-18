@@ -93,7 +93,6 @@ def ingest_mock_data():
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-    try:
         agencies = load_agencies()
         print("[Allocation.py] Starting Ingestion with Agencies:", [a['name'] for a in agencies])
         

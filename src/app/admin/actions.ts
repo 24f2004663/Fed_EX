@@ -146,10 +146,10 @@ export async function updateAgencyPerformance(id: string, month: string, metrics
             avgDSO: 45 - (metrics.recoveryRate - 60) * 0.5 // Derived simple logic
         };
 
-        // Use upsert thanks to @@unique([agencyId, month], name: "agency_month_unique")
+        // Use upsert thanks to @@unique([agencyId, month])
         await prisma.agencyPerformance.upsert({
             where: {
-                agency_month_unique: {
+                agencyId_month: {
                     agencyId: id,
                     month: month
                 }

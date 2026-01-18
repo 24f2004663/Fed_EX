@@ -52,7 +52,7 @@ model AgencyPerformance {
   
   createdAt    DateTime @default(now())
 
-  @@unique([agencyId, month], name: "agency_month_unique")
+  @@unique([agencyId, month])
 }
 
 model Invoice {
