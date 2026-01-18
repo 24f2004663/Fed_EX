@@ -9,6 +9,9 @@ RUN apt-get update && apt-get install -y \
     openssl \
     && rm -rf /var/lib/apt/lists/*
 
+COPY requirements.txt .
+RUN pip3 install -r requirements.txt
+
 # 2. Dependencies
 FROM base AS deps
 WORKDIR /app

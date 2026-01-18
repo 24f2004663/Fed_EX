@@ -1,5 +1,5 @@
 # Code Snapshot
-Generated on 2026-01-18T06:48:53.721Z
+Generated on 2026-01-18T06:56:57.042Z
 
 ## File: Allocation.py
 ```py
@@ -625,6 +625,9 @@ RUN apt-get update && apt-get install -y \
     sqlite3 \
     openssl \
     && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip3 install -r requirements.txt
 
 # 2. Dependencies
 FROM base AS deps
