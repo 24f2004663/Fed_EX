@@ -1,5 +1,5 @@
 # Code Snapshot
-Generated on 2026-01-18T07:04:54.505Z
+Generated on 2026-01-18T07:28:07.641Z
 
 ## File: Allocation.py
 ```py
@@ -127,15 +127,17 @@ def ingest_mock_data():
         
         for i in range(num_cases):
             idx = i + 1
-            p_idx = i % 3
-            p = ['HIGH', 'MEDIUM', 'LOW'][p_idx]
-            
             score = 95 - (i * 2)
             if score < 20: score = 20
             
             amount = 50000.0 - (i * 1000)
             if amount < 1000: amount = 1000
             
+            # Dynamic Priority Logic
+            if score >= 85: p = 'HIGH'
+            elif score >= 70: p = 'MEDIUM'
+            else: p = 'LOW'
+
             due_date = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)).isoformat().split('T')[0]
 
             raw_queue.append({
