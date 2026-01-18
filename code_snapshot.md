@@ -1,5 +1,5 @@
 # Code Snapshot
-Generated on 2026-01-18T06:37:04.030Z
+Generated on 2026-01-18T06:41:58.603Z
 
 ## File: Allocation.py
 ```py
@@ -6134,6 +6134,20 @@ export function decryptPII(encryptedText: string): string {
 
 export function maskInvoiceNumber(invoiceNum: string): string {
     return `${invoiceNum.slice(0, 4)}****${invoiceNum.slice(-4)}`;
+}
+
+/**
+ * Hashes a password using PBKDF2 with a random salt.
+ * Format: "salt:hash"
+ */
+export async function saltAndHashPassword(password: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const salt = crypto.randomBytes(16).toString('hex');
+        crypto.pbkdf2(password, salt, 1000, 64, 'sha512', (err, derivedKey) => {
+            if (err) reject(err);
+            else resolve(`${salt}:${derivedKey.toString('hex')}`);
+        });
+    });
 }
 
 ```
