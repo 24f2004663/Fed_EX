@@ -59,7 +59,5 @@ ENV HOSTNAME="0.0.0.0"
 ENV HOME=/tmp
 
 # Note: In standalone mode, we run 'node server.js'.
-# However, we also need to seed the DB.
-# We chain the commands.
-# We use the globally installed prisma CLI to avoid relying on node_modules location in standalone build
-CMD ["sh", "-c", "prisma db push --skip-generate && node prisma/simulate_pipeline.js && node server.js"]
+# Database migrations/seeding should be done via deploy hooks or CI/CD, not on container boot.
+CMD ["node", "server.js"]
