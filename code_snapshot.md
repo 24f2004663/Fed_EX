@@ -1,5 +1,5 @@
 # Code Snapshot
-Generated on 2026-01-18T07:28:07.641Z
+Generated on 2026-01-18T07:38:27.973Z
 
 ## File: Allocation.py
 ```py
@@ -180,7 +180,19 @@ def ingest_mock_data():
                 
                 # HP Threshold logic
                 if case_item['priority'] == 'HIGH':
-                    threshold = int(agency['totalCapacity'] * 0.75) if agency['score'] > 0.8 else (int(agency['totalCapacity'] * 0.40) if agency['score'] > 0.5 else 0)
+                    # RELAXED LOGIC:
+                    # Score > 85% -> 100% Capacity (Trust entirely)
+                    # Score > 70% -> 80% Capacity (Beta / Good agencies)
+                    # Score > 50% -> 50% Capacity (Probationary/Risky)
+                    if agency['score'] > 0.85:
+                        threshold = agency['totalCapacity']
+                    elif agency['score'] > 0.70:
+                        threshold = int(agency['totalCapacity'] * 0.80)
+                    elif agency['score'] > 0.50:
+                        threshold = int(agency['totalCapacity'] * 0.50)
+                    else:
+                        threshold = 0
+
                     batch_hp = 0
                     for cid, aid in assignments.items():
                         if aid == agency['id']:
@@ -467,7 +479,15 @@ def allocate_existing_cases():
                 
                 # HP Threshold logic 
                 if case_item['priority'] == 'HIGH':
-                    threshold = int(agency['totalCapacity'] * 0.75) if agency['score'] > 0.8 else (int(agency['totalCapacity'] * 0.40) if agency['score'] > 0.5 else 0)
+                    # RELAXED LOGIC (Same as Ingestion)
+                    if agency['score'] > 0.85:
+                        threshold = agency['totalCapacity']
+                    elif agency['score'] > 0.70:
+                        threshold = int(agency['totalCapacity'] * 0.80)
+                    elif agency['score'] > 0.50:
+                        threshold = int(agency['totalCapacity'] * 0.50)
+                    else:
+                        threshold = 0
                     
                     current_hp_load = get_agency_hp_load(cur, agency['id'])
                     batch_hp = 0
